@@ -19,6 +19,10 @@ cards init --data-file data/initial_data.yaml
 cards gen
 # Output: > mountain, medieval, elf
 
+# Generate from specific categories
+cards gen --cat "terrain,era"
+# Output: > desert, ancient
+
 # Update from YAML (adds new categories/options)
 cards update --data-file updated_data.yaml
 

@@ -1,9 +1,9 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
-from sqlalchemy.exc import IntegrityError
-from typing import List, Dict, Optional
-from datetime import datetime
 import random
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 
 Base = declarative_base()
 
@@ -81,15 +81,26 @@ class Database:
             self.session.rollback()
             return False
 
-    def get_all_categories(self) -> List[str]:
+    def get_all_categories(self) -> list[str]:
         categories = self.session.query(Category.name).order_by(Category.name).all()
         return [cat.name for cat in categories]
 
     def is_empty(self) -> bool:
         return self.session.query(Category).count() == 0
 
-    def get_random_option_per_category(self) -> Dict[str, str]:
-        categories = self.session.query(Category).all()
+    def get_random_option_per_category(
+        self, category_names: list[str] | None = None
+    ) -> dict[str, str]:
+        if category_names:
+            categories = []
+            for cat_name in category_names:
+                cat = self.session.query(Category).filter_by(name=cat_name).first()
+                if not cat:
+                    raise ValueError(f"Category '{cat_name}' does not exist")
+                categories.append(cat)
+        else:
+            categories = self.session.query(Category).all()
+
         result = {}
 
         for category in categories:
@@ -111,7 +122,7 @@ class Database:
         self.session.commit()
         return result
 
-    def reset_repeats(self, category_names: Optional[List[str]] = None) -> int:
+    def reset_repeats(self, category_names: list[str] | None = None) -> int:
         if category_names:
             options = []
             for cat_name in category_names:
