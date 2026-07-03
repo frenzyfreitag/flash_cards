@@ -43,7 +43,7 @@ dev = [
 ]
 
 [project.scripts]
-ca-flash-cards = "src.cli:app"
+cards = "src.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/dnd-flashcards"

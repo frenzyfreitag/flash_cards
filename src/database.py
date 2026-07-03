@@ -1,7 +1,7 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, func
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 from sqlalchemy.exc import IntegrityError
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 import random
 
@@ -27,6 +27,7 @@ class Option(Base):
     category_id = Column(Integer, ForeignKey('categories.id'), nullable=False)
     value = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    repeats_remaining = Column(Integer, default=1, nullable=False)
     category = relationship("Category", back_populates="options")
 
     def __repr__(self):
@@ -54,7 +55,7 @@ class Database:
         self.session.commit()
         return category.id
 
-    def add_option(self, category_name: str, value: str) -> bool:
+    def add_option(self, category_name: str, value: str, repeats: int = 1) -> bool:
         category = self.session.query(Category).filter_by(name=category_name).first()
         if not category:
             raise ValueError(f"Category '{category_name}' does not exist")
@@ -68,7 +69,11 @@ class Database:
             return False
 
         try:
-            option = Option(category_id=category.id, value=value)
+            option = Option(
+                category_id=category.id,
+                value=value,
+                repeats_remaining=repeats
+            )
             self.session.add(option)
             self.session.commit()
             return True
@@ -81,26 +86,63 @@ class Database:
         return [cat.name for cat in categories]
 
     def is_empty(self) -> bool:
-        return len(self.get_all_categories()) == 0
-
-    def get_options_by_category(self, category_name: str) -> List[str]:
-        options = (
-            self.session.query(Option.value)
-            .join(Category)
-            .filter(Category.name == category_name)
-            .order_by(Option.value)
-            .all()
-        )
-        return [opt.value for opt in options]
+        return self.session.query(Category).count() == 0
 
     def get_random_option_per_category(self) -> Dict[str, str]:
         categories = self.session.query(Category).all()
         result = {}
+
         for category in categories:
-            if category.options:
-                random_option = random.choice(category.options)
-                result[category.name] = random_option.value
+            if not category.options:
+                continue
+
+            available = [opt for opt in category.options if opt.repeats_remaining > 0]
+
+            if not available:
+                raise ValueError(
+                    f"Category '{category.name}' exhausted. "
+                    f"Run: cards reset-reps --cat {category.name}"
+                )
+
+            selected = random.choice(available)
+            selected.repeats_remaining -= 1
+            result[category.name] = selected.value
+
+        self.session.commit()
         return result
+
+    def reset_repeats(self, category_names: Optional[List[str]] = None) -> int:
+        if category_names:
+            options = []
+            for cat_name in category_names:
+                category = self.session.query(Category).filter_by(name=cat_name).first()
+                if not category:
+                    raise ValueError(f"Category '{cat_name}' does not exist")
+                options.extend(category.options)
+        else:
+            options = self.session.query(Option).all()
+
+        for option in options:
+            option.repeats_remaining = 1
+
+        self.session.commit()
+        return len(options)
+
+    def set_repeats(self, category_name: str, option_value: str, repeats: int) -> None:
+        category = self.session.query(Category).filter_by(name=category_name).first()
+        if not category:
+            raise ValueError(f"Category '{category_name}' does not exist")
+
+        option = self.session.query(Option).filter_by(
+            category_id=category.id,
+            value=option_value
+        ).first()
+
+        if not option:
+            raise ValueError(f"Option '{option_value}' not found in category '{category_name}'")
+
+        option.repeats_remaining = repeats
+        self.session.commit()
 
     def close(self):
         if self.session:
