@@ -1,0 +1,32 @@
+terrain:
+  - plateau
+  - desert
+  - swamp
+  - forest
+  - mountain
+  - plains
+  - meadow
+
+era:
+  - medieval
+  - cyberpunk
+  - ancient
+  - modern
+  - solarpunk
+  - tribal
+  - steampunk
+  - samurai
+
+character:
+  - human
+  - elf
+  - cow
+  - dinosaur
+  - parrot
+  - samurai
+  - robot
+  - insect
+  - fish
+  - dragon
+  - giant
+  - dwarf
