@@ -1,43 +1,55 @@
-# World building Flashcard Generator
+# World building flashcard Generator
+
 A Python CLI that generates random world building prompts by combining categories.
 
 ## Installation
 
-### Quick Install
-
 ```bash
-pipx install .
-ca-flash-cards --version
-```
-
-### Development Install
-
-```bash
-git clone <repository-url>
-cd flash_cards
-
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -e .
-
-ca-flash-cards --version
+pipx install ~/personal/projects/flash_cards
+cards --version
 ```
 
 ## Usage
 
-### Quick Start
-
 ```bash
-# Generate a flashcard
-ca-flash-cards
-# Output: 🎲 plateau, medieval, elf
+# Initialize database
+cards init --data-file data/initial_data.yaml
 
-# Generate multiple ca-flash-cards
-ca-flash-cards generate --count 5
+# Generate flashcard
+cards gen
+# Output: > mountain, medieval, elf
 
-# See all commands
-ca-flash-cards --help
+# Update from YAML (adds new categories/options)
+cards update --data-file updated_data.yaml
+
+# Set custom repeats for an option
+cards set-reps 5 --cat terrain --opt mountain
+
+# Reset repeats to 1
+cards reset-reps --all
+cards reset-reps --cat terrain
+
+# Show version
+cards --version
 ```
 
-## Future Enhancements
-TBD
+## Data Format
+
+YAML file with categories and options:
+
+```yaml
+terrain:
+  - mountain
+  - desert
+era:
+  - medieval
+  - cyberpunk
+```
+
+## Testing
+
+```bash
+cd ~/personal/projects/flash_cards
+source .venv/bin/activate
+pytest tests/ -v
+```
