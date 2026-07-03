@@ -5,7 +5,6 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.table import Table
-from rich import print as rprint
 
 from .database import Database
 from .generator import generate_flashcard
@@ -52,7 +51,7 @@ def main(
     pass
 
 
-@app.command()
+@app.command("gen")
 def generate(
     db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
 ):
@@ -60,115 +59,23 @@ def generate(
     Generate random flashcard
 
     Example:
-        ca-flash-cards generate
+        cards gen
     """
     with Database(db_path or get_database_path()) as db:
         if db.is_empty():
-            console.print("[red]✗[/red] Database not initialized. Run 'ca-flash-cards init' first.")
+            console.print("[red]✗[/red] Database not initialized. Run 'cards init' first.")
             raise typer.Exit(code=1)
 
-        flashcard = generate_flashcard(db)
-        if flashcard:
-            console.print(f"[bold cyan]>[/bold cyan] {flashcard}")
-        else:
-            console.print("[red]✗[/red] No categories found.")
-            raise typer.Exit(code=1)
-
-
-@app.command("add-category")
-def add_category(
-    name: str = typer.Argument(..., help="Category name to add"),
-    db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
-):
-    """
-    Add a new category
-
-    Example:
-        flashcards add-category weather
-    """
-    with Database(db_path or get_database_path()) as db:
-        category_id = db.get_or_create_category(name)
-        console.print(f"[green]✓[/green] Category '[cyan]{name}[/cyan]' created (ID: {category_id})")
-
-
-@app.command("add-option")
-def add_option(
-    category: str = typer.Argument(..., help="Category name"),
-    value: str = typer.Argument(..., help="Option value (use quotes for spaces)"),
-    db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
-):
-    """
-    Add an option to a category
-
-    Examples:
-        ca-flash-cards add-option terrain tundra
-        ca-flash-cards add-option era "solar punk"
-    """
-    with Database(db_path or get_database_path()) as db:
         try:
-            if db.add_option(category, value):
-                console.print(f"[green]✓[/green] Added '[yellow]{value}[/yellow]' to category '[cyan]{category}[/cyan]'")
+            flashcard = generate_flashcard(db)
+            if flashcard:
+                console.print(f"[bold cyan]>[/bold cyan] {flashcard}")
             else:
-                console.print(f"[red]✗[/red] Option '[yellow]{value}[/yellow]' already exists in category '[cyan]{category}[/cyan]'")
+                console.print("[red]✗[/red] No categories found.")
                 raise typer.Exit(code=1)
         except ValueError as e:
             console.print(f"[red]✗[/red] {e}")
             raise typer.Exit(code=1)
-
-
-@app.command("list-categories")
-def list_categories(
-    db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
-):
-    """
-    List all categories
-
-    Example:
-        flashcards list-categories
-    """
-    with Database(db_path or get_database_path()) as db:
-        categories = db.get_all_categories()
-
-        if categories:
-            table = Table(title="Categories", show_header=True, header_style="bold magenta")
-            table.add_column("#", style="dim", width=6)
-            table.add_column("Name", style="cyan")
-            table.add_column("Options", justify="right", style="green")
-
-            for idx, cat in enumerate(categories, 1):
-                option_count = len(db.get_options_by_category(cat))
-                table.add_row(str(idx), cat, str(option_count))
-
-            console.print(table)
-        else:
-            console.print("[yellow]No categories found.[/yellow]")
-
-
-@app.command("list-options")
-def list_options(
-    category: str = typer.Argument(..., help="Category name"),
-    db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
-):
-    """
-    List options in a category
-
-    Example:
-        flashcards list-options terrain
-    """
-    with Database(db_path or get_database_path()) as db:
-        options = db.get_options_by_category(category)
-
-        if options:
-            table = Table(title=f"Options in '{category}'", show_header=True, header_style="bold magenta")
-            table.add_column("#", style="dim", width=6)
-            table.add_column("Value", style="yellow")
-
-            for idx, opt in enumerate(options, 1):
-                table.add_row(str(idx), opt)
-
-            console.print(table)
-        else:
-            console.print(f"[yellow]No options found in category '[cyan]{category}[/cyan]'[/yellow]")
 
 
 @app.command()
@@ -181,8 +88,8 @@ def init(
     Initialize database (empty or from YAML)
 
     Examples:
-        ca-flash-cards init                              # Empty database
-        ca-flash-cards init --data-file my_data.yaml     # Load from YAML
+        cards init                              # Empty database
+        cards init --data-file my_data.yaml     # Load from YAML
     """
     with Database(db_path or get_database_path()) as db:
         if not force and not db.is_empty():
@@ -204,30 +111,65 @@ def init(
             console.print(f"[green]✓[/green] Database initialized (empty)")
 
 
-@app.command()
-def stats(
+@app.command("set-reps")
+def set_repeats(
+    repeats: int = typer.Argument(..., help="Repeats value (1 or higher)"),
+    cat: str = typer.Option(..., "--cat", help="Category name"),
+    option: str = typer.Option(..., "--opt", help="Option value"),
     db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
 ):
     """
-    Show database statistics
+    Set repeats for a specific option
 
     Example:
-        flashcards stats
+        cards set-reps 7 --cat terrain --opt mountain
     """
+    if repeats < 1:
+        console.print("[red]✗[/red] Repeats must be 1 or higher")
+        raise typer.Exit(code=1)
+
     with Database(db_path or get_database_path()) as db:
-        categories = db.get_all_categories()
+        try:
+            db.set_repeats(cat, option, repeats)
+            console.print(
+                f"[green]✓[/green] Set '[yellow]{option}[/yellow]' in '[cyan]{cat}[/cyan]' "
+                f"to repeats={repeats}"
+            )
+        except ValueError as e:
+            console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=1)
 
-        table = Table(title="Database Statistics", show_header=True, header_style="bold magenta")
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", justify="right", style="green")
 
-        total_options = sum(len(db.get_options_by_category(cat)) for cat in categories)
+@app.command("reset-reps")
+def reset_repeats(
+    all_categories: bool = typer.Option(False, "--all", help="Reset all categories to 1"),
+    cat: Optional[str] = typer.Option(None, "--cat", help="Comma-separated category names to reset to 1"),
+    db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
+):
+    """
+    Reset repeats for categories (sets all to 1)
 
-        table.add_row("Total Categories", str(len(categories)))
-        table.add_row("Total Options", str(total_options))
-        table.add_row("Avg Options/Category", f"{total_options / len(categories):.1f}" if categories else "0")
+    Examples:
+        cards reset-reps --all
+        cards reset-reps --cat terrain
+        cards reset-reps --cat "terrain,era"
+    """
+    if not all_categories and not cat:
+        console.print("[red]✗[/red] Specify --all or --cat <categories>")
+        raise typer.Exit(code=1)
 
-        console.print(table)
+    with Database(db_path or get_database_path()) as db:
+        try:
+            if all_categories:
+                count = db.reset_repeats(None)
+                console.print(f"[green]✓[/green] Reset all categories to 1 ({count} options)")
+            else:
+                category_list = [c.strip() for c in cat.split(",")]
+                count = db.reset_repeats(category_list)
+                console.print(f"[green]✓[/green] Reset {len(category_list)} category(ies) to 1 ({count} options)")
+        except ValueError as e:
+            console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=1)
 
 
 def cli_main():
