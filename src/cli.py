@@ -1,3 +1,4 @@
+import random
 import sys
 
 import typer
@@ -47,6 +48,9 @@ def main(
 @app.command("gen")
 def generate(
     cat: str | None = typer.Option(None, "--cat", help="Comma-separated category names"),
+    rand_cat: int | None = typer.Option(
+        None, "--rand-cat", help="Number of random categories to select"
+    ),
     db_path: str | None = typer.Option(None, "--db", help="Custom database path"),
 ):
     """
@@ -55,14 +59,33 @@ def generate(
     Examples:
         cards gen
         cards gen --cat "terrain,era"
+        cards gen --rand-cat 4
     """
     with Database(db_path or DB_PATH) as db:
         if db.is_empty():
             console.print("[red]✗[/red] Database not initialized. Run 'cards init' first.")
             raise typer.Exit(code=1)
 
+        if cat and rand_cat:
+            console.print("[red]✗[/red] Cannot use both --cat and --rand-cat")
+            raise typer.Exit(code=1)
+
         try:
-            category_list = [c.strip() for c in cat.split(",")] if cat else None
+            if rand_cat is not None:
+                if rand_cat < 1:
+                    console.print("[red]✗[/red] --rand-cat must be at least 1")
+                    raise typer.Exit(code=1)
+                all_categories = db.get_all_categories()
+                if rand_cat > len(all_categories):
+                    console.print(
+                        f"[red]✗[/red] Requested {rand_cat} categories "
+                        f"but only {len(all_categories)} available"
+                    )
+                    raise typer.Exit(code=1)
+                category_list = random.sample(all_categories, rand_cat)
+            else:
+                category_list = [c.strip() for c in cat.split(",")] if cat else None
+
             flashcard = generate_flashcard(db, category_list)
             if flashcard:
                 console.print(f"[bold cyan]>[/bold cyan] {flashcard}")
