@@ -23,6 +23,10 @@ cards gen
 cards gen --cat "terrain,era"
 # Output: > desert, ancient
 
+# Generate from N random categories
+cards gen --rand-cat 2
+# Output: > plateau, elf
+
 # Update from YAML (adds new categories/options)
 cards update --data-file updated_data.yaml
 
