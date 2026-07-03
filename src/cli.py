@@ -1,10 +1,8 @@
 import sys
-from pathlib import Path
 from typing import Optional
 
 import typer
 from rich.console import Console
-from rich.table import Table
 
 from .database import Database
 from .generator import generate_flashcard
@@ -80,7 +78,9 @@ def generate(
 
 @app.command()
 def init(
-    data_file: Optional[str] = typer.Option(None, "--data-file", help="YAML file path to load data from"),
+    data_file: Optional[str] = typer.Option(
+        None, "--data-file", help="YAML file path to load data from"
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Force reinitialization"),
     db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
 ):
@@ -103,12 +103,66 @@ def init(
                 data = load_initial_data(data_file)
                 count = populate_db(db, data)
                 num_categories = len(db.get_all_categories())
-                console.print(f"[green]✓[/green] Database initialized with {count} options across {num_categories} categories")
+                console.print(
+                    f"[green]✓[/green] Database initialized with {count} options "
+                    f"across {num_categories} categories"
+                )
             except FileNotFoundError:
                 console.print(f"[red]✗[/red] Data file not found: {data_file}")
                 raise typer.Exit(code=1)
         else:
-            console.print(f"[green]✓[/green] Database initialized (empty)")
+            console.print("[green]✓[/green] Database initialized (empty)")
+
+
+@app.command()
+def update(
+    data_file: str = typer.Option(..., "--data-file", help="YAML file path to update from"),
+    db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
+):
+    """
+    Update database from YAML (adds new categories/options, preserves existing)
+
+    Example:
+        cards update --data-file my_data.yaml
+    """
+    from .populate_data import load_initial_data
+
+    with Database(db_path or get_database_path()) as db:
+        if db.is_empty():
+            console.print("[red]✗[/red] Database not initialized. Run 'cards init' first.")
+            raise typer.Exit(code=1)
+
+        try:
+            data = load_initial_data(data_file)
+            added_categories = 0
+            added_options = 0
+
+            existing_categories = db.get_all_categories()
+
+            for category_name, options in data.items():
+                if category_name not in existing_categories:
+                    db.get_or_create_category(category_name)
+                    added_categories += 1
+
+                if options:
+                    for option_value in options:
+                        try:
+                            if db.add_option(category_name, option_value):
+                                added_options += 1
+                        except ValueError:
+                            pass
+
+            if added_categories == 0 and added_options == 0:
+                console.print("[yellow]No new categories or options to add.[/yellow]")
+            else:
+                console.print(
+                    f"[green]✓[/green] Updated database: "
+                    f"{added_categories} new categories, {added_options} new options"
+                )
+
+        except FileNotFoundError:
+            console.print(f"[red]✗[/red] Data file not found: {data_file}")
+            raise typer.Exit(code=1)
 
 
 @app.command("set-reps")
@@ -143,7 +197,9 @@ def set_repeats(
 @app.command("reset-reps")
 def reset_repeats(
     all_categories: bool = typer.Option(False, "--all", help="Reset all categories to 1"),
-    cat: Optional[str] = typer.Option(None, "--cat", help="Comma-separated category names to reset to 1"),
+    cat: Optional[str] = typer.Option(
+        None, "--cat", help="Comma-separated category names to reset to 1"
+    ),
     db_path: Optional[str] = typer.Option(None, "--db", help="Custom database path"),
 ):
     """
@@ -166,7 +222,10 @@ def reset_repeats(
             else:
                 category_list = [c.strip() for c in cat.split(",")]
                 count = db.reset_repeats(category_list)
-                console.print(f"[green]✓[/green] Reset {len(category_list)} category(ies) to 1 ({count} options)")
+                console.print(
+                    f"[green]✓[/green] Reset {len(category_list)} category(ies) "
+                    f"to 1 ({count} options)"
+                )
         except ValueError as e:
             console.print(f"[red]✗[/red] {e}")
             raise typer.Exit(code=1)

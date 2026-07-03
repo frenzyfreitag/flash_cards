@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
 from sqlalchemy.exc import IntegrityError
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional
 from datetime import datetime
 import random
 
@@ -42,8 +42,8 @@ class Database:
     def __init__(self, db_path: str = "flashcards.db"):
         self.engine = create_engine(f'sqlite:///{db_path}', echo=False)
         Base.metadata.create_all(self.engine)
-        SessionLocal = sessionmaker(bind=self.engine)
-        self.session: Session = SessionLocal()
+        session_local = sessionmaker(bind=self.engine)
+        self.session: Session = session_local()
 
     def get_or_create_category(self, name: str) -> int:
         category = self.session.query(Category).filter_by(name=name).first()
