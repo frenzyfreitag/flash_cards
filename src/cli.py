@@ -140,7 +140,7 @@ def update(
     db_path: str | None = typer.Option(None, "--db", help="Custom database path"),
 ):
     """
-    Update database from YAML (adds new categories/options, preserves existing)
+    Sync database to match YAML file exactly (preserves repeats_remaining)
 
     Example:
         cards update --data-file my_data.yaml
@@ -152,31 +152,17 @@ def update(
 
         try:
             data = load_initial_data(data_file)
-            added_categories = 0
-            added_options = 0
+            counts = db.sync_from_data(data)
 
-            existing_categories = db.get_all_categories()
-
-            for category_name, options in data.items():
-                if category_name not in existing_categories:
-                    db.get_or_create_category(category_name)
-                    added_categories += 1
-
-                if options:
-                    for option_value in options:
-                        try:
-                            if db.add_option(category_name, option_value):
-                                added_options += 1
-                        except ValueError:
-                            pass
-
-            if added_categories == 0 and added_options == 0:
-                console.print("[yellow]No new categories or options to add.[/yellow]")
+            if sum(counts.values()) == 0:
+                console.print("[yellow]Database already matches YAML file.[/yellow]")
             else:
-                console.print(
-                    f"[green]✓[/green] Updated database: "
-                    f"{added_categories} new categories, {added_options} new options"
-                )
+                parts = [
+                    f"{'+' if k.startswith('added') else '-'}{v} {k.split('_')[1]}"
+                    for k, v in counts.items()
+                    if v > 0
+                ]
+                console.print(f"[green]✓[/green] Synced database: {', '.join(parts)}")
 
         except FileNotFoundError as e:
             console.print(f"[red]✗[/red] Data file not found: {data_file}")
